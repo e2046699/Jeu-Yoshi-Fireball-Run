@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="fr">
+    <head>
+        <meta charset="utf-8" />
+        <title>Tp partie 2 -- Final -- Esteban Astudillo</title>
+        <style>
+            canvas {             
+                outline: 10px ridge #12B31D;
+                cursor: pointer;
+                background: linear-gradient(to bottom, #222222, #eeeeee);
+                margin-top:300px;
+                padding-left: 0;
+                padding-right: 0;
+                margin-left: auto;
+                margin-right: auto;
+                display: block;                           
+            }
+
+            body{
+                background-color: black;
+                background-image: url("imagesPartie2/backgroundBody.gif");
+                background-size: cover;
+            }
+        </style>
+    </head>
+
+    <body>
+        <!-- Créer la balise canvas -->
+        <canvas width="700" height = "375"></canvas>
+
+       <script>
+            //Récupérer la balise canvas et définir son contexte de dessin en 2d
+            let leCanvas = document.querySelector("canvas");
+            let ctx = leCanvas.getContext("2d");
+
+            //image pour intro
+            leCanvas.style.backgroundImage = "url('imagesPartie2/background_img_yoshi_depart.png')";
+
+
+            //l'objet du personnage
+            let yoshi = {
+                img: new Image(), //image
+                urlImage:"imagesPartie2/immobileGauche.png", //url image depart//
+                x: 0, //Position sur l'axe des x
+                y: 0, //Position sur l'axe des y
+                largeur: 27, //Largeur d'une vignette du personnage
+                hauteur: 30, //Hauteur d'une vignette du personnage
+                indexVignette: 0, //Première vignette
+                nbVignettes: 10, //Nombre de vignettes
+                sourceX: 0, //Coordonnée x de la vignette à afficher
+                vitesseX: 7, //Vitesse horizontale
+            };
+            //Charger l'image initiale du personnage
+            yoshi.img.src = yoshi.urlImage;
+            // positionner sur l'axe des X et des Y au centre en en bas du canvas
+            yoshi.x = (leCanvas.width - yoshi.largeur) / 2;
+            yoshi.y = leCanvas.height - yoshi.hauteur;
+
+            //l'objet du yoshi qui apparait apres avoir gagner
+            let yoshiVictoire ={
+                img: new Image(), //image
+                urlImage:"imagesPartie2/yoshiVictoire.png", //url image depart//
+                x: 0, //Position sur l'axe des x
+                y: 0, //Position sur l'axe des y
+                largeur: 26.25, //Largeur d'une vignette du personnage
+                hauteur: 34, //Hauteur d'une vignette du personnage
+                indexVignette: 0, //Première vignette
+                nbVignettes: 7, //Nombre de vignettes
+                sourceX: 0, //Coordonnée x de la vignette à afficher
+                vitesseX: 7, //Vitesse horizontale
+            };
+                //Charger l'image victoire du personnage
+                yoshiVictoire.img.src = yoshiVictoire.urlImage;
+                // positionner sur l'axe des X et des Y au centre en en bas du canvas
+                yoshiVictoire.x = (leCanvas.width - yoshiVictoire.largeur) / 2;
+                yoshiVictoire.y = leCanvas.height - yoshiVictoire.hauteur;
+             
+            //Gestion des vies //
+             let vie = {
+                img: new Image(),
+                x: 0,
+                y: 0,
+                largeur: 10,
+                hauteur: 10,
+            };
+            vie.img.src = "imagesPartie2/greenHeart.png";
+
+            let nombreVies = 3;
+          
+            //Objet pour gérer les touches fléchées du clavier
+            let fleches = {
+                gauche: false,
+                droite: false,
+            };
+            let sonCollision = new Audio("sons/sonOuch.mp3");
+            let musiqueYoshi = new Audio("sons/flowerGarden.mp3");
+            let musiqueGagne = new Audio("sons/musiqueGagne.mp3");
+            let sonPerdu = new Audio("sons/sadMusic.mp3");
+            let intervaljeuID; 
+            let intervalyoshiID;
+            let intervalFeuID;
+            //le count pour augmenter le spawn de feu a chaque 10 sec
+            let compteur = 45;
+            //les proprietes du compteur
+            ctx.font = "bold 24px Calibri";
+            ctx.textAlign ="end";
+            ctx.textBaseline = "top";
+            ctx.fillStyle = "orange"; //Rouge
+            //Tableau pour stocker les boules de feu
+            let lesBoules = [];
+            ////////////////////////////// DÉMARRAGE ET ÉVÉNEMENTS DU JEU ///////////////////////////////////
+
+          
+                //Écouteur sur le document pour détecter si des touches de clavier sont appuyées ou relâchées
+                document.addEventListener("keydown", presserTouche);
+                document.addEventListener("keyup",relacherTouche);
+                const gererKeyDown= (event) => {
+                if (event.key === 'Enter') {
+                debuterJeu();
+                }
+                };
+                document.addEventListener('keydown', gererKeyDown);
+                //Fonction qui debute le jeu//
+                 function debuterJeu(){
+                //effacer le canvas
+                ctx.clearRect(0,0,leCanvas.width,leCanvas.height);
+                //On affiche l'image de debut//
+                leCanvas.style.background="url('imagesPartie2/background_img_yoshi.png')"
+
+                //On part l'actualisation du jeu avec setInterval()
+                intervaljeuID = setInterval(actualiserJeu, 1000/60 );
+                
+                intervalyoshiID = setInterval(gererImageYoshi, 1000/6);
+                
+                //On met une boule à tous les 1/5secondes./
+                intervalFeuID = setInterval(spawnFeu,200);
+
+                //Mettre une première boule
+                spawnFeu();      
+                
+                //On enleve le gestionaire d'evenement//
+                document.removeEventListener('keydown', gererKeyDown);
+
+                //Jouer la musique
+                musiqueYoshi.play();
+        
+                var x = setInterval(function() {
+
+                // Decrement le compteur par 1
+                compteur--;
+                }, 1000);   
+        
+            }
+ 
+            /////////////////////////// LES FONCTIONS ////////////////////////////////////////////////////////////
+
+         //Actualiser l'affichage des objets et les actions du jeu
+           function actualiserJeu() {
+                //Effacer le contenu actuel du contexte de rendu du canvas
+                ctx.clearRect(0, 0, leCanvas.width, leCanvas.height);
+                //Déplacer le personnage
+                deplacerYoshi();
+                //Afficher les vies
+                afficherLesVies();
+                //Deplacer le feu
+                deplacerFeu();
+                 /*Vérifier s'il y a une collision entre Yoshi et une boule
+                Si oui on diminue le nombre de vies... et si Yoshi n'a plus de vie
+                C'est la fin du jeu...
+                on efface le canvas
+                on affiche l'image de la fin du jeu
+                On arrête les setInterval en exécution et ...
+                On arrête l'exécution de cette boucle de programmation
+                */
+                ctx.fillText("Temps restant à survivre :" + compteur,leCanvas.width,0);
+                for(let uneBoule of lesBoules){
+                    let siCollisionYoshiEtBoule = detecterCollision(yoshi, uneBoule);
+                    if(siCollisionYoshiEtBoule){
+                        sonCollision.play();
+
+                    let index = lesBoules.indexOf(uneBoule);
+                    lesBoules.splice(index, 1);
+                    nombreVies--;
+                    }
+                    //On arrete le jeu si les vies atteignent zero
+                    if(nombreVies == 0){
+                    ctx.clearRect(0,0,leCanvas.width,leCanvas.height);
+                    clearInterval(intervaljeuID);
+                    clearInterval(intervalFeuID);
+                    clearInterval(intervalyoshiID);
+                    leCanvas.style.backgroundImage="url('imagesPartie2/backgroundFin.png')";
+                    musiqueYoshi.pause(); 
+                    sonPerdu.play();
+                    //quand on pese r ca restart le jeu
+                    document.addEventListener('keydown', function(event) {
+                     var key_press = String.fromCharCode(event.keyCode);
+                    if(event.keyCode == 82) { location.reload();}
+                    });
+                    }
+                }
+                    
+                    /*on augmente le nombre de boules plus le temps avance*/
+                    if(compteur==35){
+                        clearInterval(intervalFeuID);
+                        intervalFeuID = setInterval(spawnFeu,150);
+                    }
+
+                    if(compteur==25){
+                        clearInterval(intervalFeuID);
+                        intervalFeuID = setInterval(spawnFeu,125);
+                    }
+                    if(compteur==15){
+                        clearInterval(intervalFeuID);
+                        intervalFeuID = setInterval(spawnFeu,100);
+                        
+                    }
+                    if(compteur==5){
+                        clearInterval(intervalFeuID);
+                        intervalFeuID = setInterval(spawnFeu,50);
+                    }
+
+                    if(compteur==0 && nombreVies > 0){
+                        ctx.clearRect(0,0,leCanvas.width,leCanvas.height);
+                        leCanvas.style.backgroundImage="url('imagesPartie2/backgroundGagne.png')";
+                        clearInterval(intervaljeuID);
+                        clearInterval(intervalFeuID);
+                        clearInterval(intervalyoshiID);
+                        musiqueYoshi.pause();  
+                        musiqueGagne.play();
+                        setInterval(animerImageYoshiVictoire,1000/12); 
+                        //quand on pese r ca restart le jeu
+                        document.addEventListener('keydown', function(event) {
+                        var key_press = String.fromCharCode(event.keyCode);
+                        if(event.keyCode == 82) { location.reload();}
+                        }); 
+                        }
+            }
+            
+            //Fonction pour déplacer et dessiner le personnage
+            function deplacerYoshi() {
+                //Calculer les futures positions du perso et définir la feuille de sprites à afficher
+                if (fleches.droite) {
+                    yoshi.x += yoshi.vitesseX;
+                    yoshi.img.src="imagesPartie2/CourseDroite.png";    
+                }
+                if (fleches.gauche) {
+                    yoshi.x -= yoshi.vitesseX;
+                    yoshi.img.src="imagesPartie2/CourseGauche.png";  
+                }
+
+                //Dessiner le personnage
+                ctx.drawImage(
+                yoshi.img,
+                yoshi.sourceX,
+                0,
+                yoshi.largeur,
+                yoshi.hauteur,
+                yoshi.x,
+                yoshi.y-48,
+                yoshi.largeur,
+                yoshi.hauteur,
+                );
+    
+                //Si le yoshi touche a droite il ne peut pas sortir et vice-verca
+                //À droite
+                if (yoshi.x < 0 ) {
+                    yoshi.x = 0;
+                }
+                //À gauche
+                let xMax= leCanvas.width -yoshi.largeur;
+                if (yoshi.x > xMax) {
+                   yoshi.x = xMax;
+                }
+            }
+
+            //Fonction pour gérer la vignette à afficher pour l'animation du personnage
+            function gererImageYoshi() {
+                //Définir la coordonnée sourceX de la vignette à afficher
+                yoshi.sourceX = yoshi.indexVignette * yoshi.largeur;
+                
+            //Incrémenter et gérer l’index de la prochaine vignette à afficher
+                yoshi.indexVignette += 1;
+
+            if (yoshi.indexVignette == yoshi.nbVignettes) {
+                yoshi.indexVignette = 0;
+            }
+            
+        }
+           
+            function animerImageYoshiVictoire(){
+                //effacer le canvas
+                ctx.clearRect(0,0,leCanvas.width,leCanvas.height);
+                //Dessiner le personnage
+                ctx.drawImage(
+                yoshiVictoire.img,
+                yoshiVictoire.sourceX,
+                0,
+                yoshiVictoire.largeur,
+                yoshiVictoire.hauteur,
+                yoshiVictoire.x,
+                yoshiVictoire.y-48,
+                yoshiVictoire.largeur,
+                yoshiVictoire.hauteur,
+                );
+                
+                //Définir la coordonnée sourceX de la vignette à afficher
+                yoshiVictoire.sourceX = yoshiVictoire.indexVignette * yoshiVictoire.largeur;
+                
+                //Incrémenter et gérer l’index de la prochaine vignette à afficher
+                yoshiVictoire.indexVignette += 1;
+    
+                if (yoshiVictoire.indexVignette == yoshiVictoire.nbVignettes) {
+                    yoshiVictoire.indexVignette = 0;
+                }
+                 //Si le yoshi touche a droite il ne peut pas sortir et vice-verca
+                //À droite
+                if (yoshiVictoire.x < 0 ) {
+                    yoshiVictoire.x = 0;
+                    yoshiVictoire.img.src = "imagesPartie2/yoshiVictoireDroite.png";
+                    yoshiVictoire.vitesseX *= -1;
+                }
+                //À gauche
+                let xMax= leCanvas.width - yoshiVictoire.largeur;
+                if (yoshiVictoire.x > xMax) {
+                   yoshiVictoire.x = xMax;
+                   yoshiVictoire.vitesseX += leCanvas.width - yoshiVictoire.x;
+                   yoshiVictoire.img.src = "imagesPartie2/yoshiVictoire.png";
+                }
+                yoshiVictoire.x -= yoshiVictoire.vitesseX;
+            }
+
+             //Fonction qui ajoutera une boule à tous les 1/5 secondea
+             function spawnFeu() {
+                //Objet pour une roche
+                let bouleFeu = {
+                    img: new Image(),
+                    urlImage: "imagesPartie2/imageFireball.png",
+                    x: entierHasard(0, leCanvas.width - 16),
+                    y: -16,
+                    largeur: 16,
+                    hauteur: 16,
+                    vitesseY: entierHasard(3, 7),
+                };
+                //Charger l'image //
+                bouleFeu.img.src = bouleFeu.urlImage;
+
+                //Mettre la boule dans le tableau des boules
+                lesBoules.push(bouleFeu);
+            }
+            
+            //Fonction pour déplacer les boules
+            function deplacerFeu() {
+                //Les boules descendent dans le canvas//
+                for(let uneBoule of lesBoules){
+                    uneBoule.y += uneBoule.vitesseY;
+                    ctx.drawImage(uneBoule.img, uneBoule.x, uneBoule.y)
+                
+                //On les enleve quand elle quitte le canvas//
+                if(uneBoule.y > leCanvas.height){
+                    //recupere la position de uneBoule dans lesBoules
+                    let index = lesBoules.indexOf(uneBoule);
+                    //enleve uneBoule a la position pointé par index
+                    lesBoules.splice(index,1);
+                    }
+                    
+                }
+            }
+            //Fonction pour calculer un nombre entier au hasard entre 2 valeurs
+            function entierHasard(nbMin, nbMax) {
+                let intervalleNb = nbMax - nbMin;
+                return nbMin + Math.round(Math.random() * intervalleNb);
+            }
+
+              //Afficher l'image de vie plusieurs fois selon la valeur de la variable nombreVies
+              function afficherLesVies() {
+                for (let index = 0; index < nombreVies; index++) {
+                    vie.x = index * (vie.largeur + 25);
+                    //console.log(vie.x);
+                    ctx.drawImage(vie.img, 
+                    vie.x, 
+                    vie.y, 
+                    yoshi.largeur,
+                    yoshi.hauteur);
+                }
+            }
+           
+            // Détecter quelles touches sont appuyées//
+            function presserTouche(event) {
+                    event.preventDefault();
+                //Enregistrer si une touche gauche/droite est pressée
+                if (event.keyCode == 39) {
+                    //flèche droite
+                    fleches.droite = true;
+                }
+                if (event.keyCode == 37) {
+                    //flèche gauche
+                    fleches.gauche = true;
+                }
+            }
+
+            // Détecte quelles touches sont relâchées
+            function relacherTouche(event) {
+                //Enregistrer si une touche gauche/droite est relâchée
+                if (event.keyCode == 39) {
+                    //flèche droite
+                    fleches.droite = false;
+                    yoshi.img.src="imagesPartie2/immobileDroite.png";
+                }
+                if (event.keyCode == 37) {
+                    //flèche gauche
+                    fleches.gauche = false;
+                    yoshi.img.src= "imagesPartie2/immobileGauche.png";  
+                }
+            
+            }    
+            
+             //Fonction pour détecter la collision entre un rectangle et un cercle
+            //Ici Yoshi est considéré comme le rectangle et une roche comme un cercle
+            function detecterCollision(leRectangle, leCercle) {
+                //Calculs du rayon et des coordonnées x et y du centre du cercle
+                let rayonCercle = leCercle.largeur / 2;
+                let centreX_duCercle = leCercle.x + rayonCercle;
+                let centreY_duCercle = leCercle.y + rayonCercle;
+
+                //La problématique est avec les coins des images
+                //Il faut donc vérifier de quel côté du rectangle se situe le cercle?
+                //Le code va d'abord tester quel coin du rectangle est le plus proche du cercle,
+                let coinX = centreX_duCercle;
+                let coinY = centreY_duCercle;
+                if (centreX_duCercle < leRectangle.x) {
+                    coinX = leRectangle.x; //coin gauche
+                } else if (centreX_duCercle > leRectangle.x + leRectangle.largeur) {
+                    coinX = leRectangle.x + leRectangle.largeur; // coin droit
+                }
+
+                if (centreY_duCercle < leRectangle.y) {
+                    coinY = leRectangle.y; // coin supérieur
+                } else if (centreY_duCercle > leRectangle.y + leRectangle.hauteur) {
+                    coinY = leRectangle.y + leRectangle.hauteur; // coin inférieur
+                }
+
+                //Maintenant que nous savons quel coin vérifier, nous utilisons
+                //le théorème de Pythagore en utilisant le centre du cercle et le coin identifié
+                let distanceX = centreX_duCercle - coinX;
+                let distanceY = centreY_duCercle - coinY;
+                let distanceXY = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+
+                //I y a une détection de collision si la distanceXY est plus petite que le rayon du cercle.
+                if (distanceXY <= rayonCercle) {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        </script>
+    </body>
+</html> 
